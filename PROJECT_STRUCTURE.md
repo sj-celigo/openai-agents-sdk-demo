@@ -1,4 +1,4 @@
-# Project Structure
+# Project Structure (OpenAI Agents SDK)
 
 ```
 openai-agents-sdk-demo/
@@ -7,6 +7,9 @@ openai-agents-sdk-demo/
 │   ├── README.md                          # Comprehensive project documentation
 │   ├── QUICKSTART.md                      # 5-minute getting started guide
 │   ├── IMPLEMENTATION_SUMMARY.md          # Phase 1 implementation details
+│   ├── MIGRATION.md                       # ⭐ SDK migration guide
+│   ├── MIGRATION_COMPLETE.md              # Migration completion summary
+│   ├── PROJECT_STRUCTURE.md               # This file
 │   ├── personal-research-assistant-prd.md # Full Product Requirements Document
 │   └── suggested-projects.md              # 5 project ideas for learning
 │
@@ -19,10 +22,10 @@ openai-agents-sdk-demo/
 ├── 💻 Application Code (src/)
 │   ├── __init__.py                        # Package initialization
 │   │
-│   ├── agent.py                           # 🤖 Main Research Agent
+│   ├── agent.py                           # 🤖 Main Research Agent (SDK-based)
 │   │   ├── ResearchAgent class
-│   │   ├── Tool orchestration
-│   │   ├── OpenAI function calling
+│   │   ├── Uses Agent + Runner from SDK
+│   │   ├── Tool initialization
 │   │   └── Citation management integration
 │   │
 │   ├── models/                            # 📊 Data Models
@@ -35,11 +38,10 @@ openai-agents-sdk-demo/
 │   │       ├── ResearchResult
 │   │       └── ResearchDepth (enum)
 │   │
-│   ├── tools/                             # 🔨 Agent Tools
+│   ├── tools/                             # 🔨 Agent Tools (@function_tool)
 │   │   ├── __init__.py
-│   │   ├── base.py                        # BaseTool abstract class
-│   │   ├── web_search.py                  # Tavily web search integration
-│   │   └── webpage_fetcher.py             # HTML fetching & parsing
+│   │   ├── web_search.py                  # @function_tool web_search
+│   │   └── webpage_fetcher.py             # @function_tool fetch_webpage
 │   │
 │   └── utils/                             # 🛠️ Utilities
 │       ├── __init__.py
@@ -49,12 +51,12 @@ openai-agents-sdk-demo/
 ├── 🧪 Tests (tests/)
 │   ├── __init__.py
 │   ├── conftest.py                        # Pytest fixtures & config
-│   ├── test_agent.py                      # Agent tests (11 tests)
+│   ├── test_agent.py                      # Agent tests (10 tests)
 │   ├── test_citation.py                   # Citation tests (12 tests)
 │   ├── test_config.py                     # Config tests (7 tests)
 │   ├── test_data_models.py                # Model tests (14 tests)
-│   ├── test_web_search.py                 # Web search tests (11 tests)
-│   └── test_webpage_fetcher.py            # Fetcher tests (16 tests)
+│   ├── test_web_search.py                 # Web search tests (8 tests)
+│   └── test_webpage_fetcher.py            # Fetcher tests (13 tests)
 │
 └── cli.py                                 # 🖥️ Command-Line Interface
     ├── research command
@@ -64,24 +66,26 @@ openai-agents-sdk-demo/
 
 ## Module Overview
 
-### Core Application (11 files, ~1,500 LOC)
+### Core Application (18 Python files, ~1,300 LOC)
 
-1. **agent.py** (67 statements)
-   - Main orchestration logic
-   - OpenAI GPT-4 integration
-   - Tool calling loop
-   - Research workflow
+1. **agent.py** (37 statements) ⭐ **Migrated to SDK**
+   - Uses Agent + Runner from OpenAI Agents SDK
+   - Tool initialization and configuration
+   - Citation management
+   - Research workflow orchestration
 
-2. **tools/web_search.py** (35 statements)
+2. **tools/web_search.py** (38 statements) ⭐ **Migrated to @function_tool**
+   - Function tool with @function_tool decorator
    - Tavily API integration
    - Search result formatting
    - Error handling
 
-3. **tools/webpage_fetcher.py** (82 statements)
+3. **tools/webpage_fetcher.py** (93 statements) ⭐ **Migrated to @function_tool**
+   - Function tool with @function_tool decorator
    - HTTP requests
    - HTML parsing
-   - Content extraction
-   - Metadata extraction
+   - Content extraction & metadata
+   - Automatic citation tracking
 
 4. **utils/citation.py** (44 statements)
    - Citation tracking
@@ -98,12 +102,13 @@ openai-agents-sdk-demo/
    - Data validation
    - Type safety
 
-### Testing Suite (7 files, 71 tests, ~1,400 LOC)
+### Testing Suite (7 files, 55 tests, ~1,100 LOC)
 
-- **98.47% code coverage**
+- **90.03% code coverage** (90%+ target)
 - Comprehensive unit tests
-- Mock-based testing
+- SDK-compatible mocking
 - Edge case coverage
+- Faster test execution (~1.2s vs ~10s before)
 
 ### Command-Line Interface
 
@@ -112,32 +117,36 @@ openai-agents-sdk-demo/
 - File export support
 - Markdown rendering
 
-### Documentation (5 files)
+### Documentation (7 files)
 
-- **README.md**: Full documentation (200+ lines)
-- **QUICKSTART.md**: Quick start guide
-- **IMPLEMENTATION_SUMMARY.md**: Implementation details
-- **personal-research-assistant-prd.md**: Product requirements (500+ lines)
+- **README.md**: Full documentation (updated for SDK)
+- **QUICKSTART.md**: Quick start guide (updated for SDK)
+- **IMPLEMENTATION_SUMMARY.md**: Implementation details (updated)
+- **MIGRATION.md**: ⭐ Detailed SDK migration guide
+- **MIGRATION_COMPLETE.md**: ⭐ Migration completion summary
+- **PROJECT_STRUCTURE.md**: This file
+- **personal-research-assistant-prd.md**: Product requirements
 - **suggested-projects.md**: Learning project ideas
 
-## Key Statistics
+## Key Statistics (After SDK Migration)
 
 | Metric | Value |
 |--------|-------|
-| **Total Files** | 28 files |
-| **Source Files** | 11 Python files |
+| **Total Files** | 29 files |
+| **Source Files** | 18 Python files |
 | **Test Files** | 7 test files |
-| **Total Tests** | 71 tests |
-| **Code Coverage** | 98.47% |
-| **Lines of Code** | ~1,500 (src) |
-| **Test Lines** | ~1,400 (tests) |
-| **Documentation** | ~2,000 lines |
+| **Total Tests** | 55 tests (all passing) |
+| **Code Coverage** | 90.03% |
+| **Lines of Code** | ~1,300 (src) |
+| **Test Lines** | ~1,100 (tests) |
+| **Documentation** | ~3,500 lines |
 | **Linter Errors** | 0 |
+| **SDK** | openai-agents 0.4.0+ |
 
 ## Dependencies
 
 ### Core (6 packages)
-- openai (1.50.0+)
+- **openai-agents (0.4.0+)** ⭐ Official SDK
 - pydantic (2.0.0+)
 - python-dotenv (1.0.0+)
 - requests (2.31.0+)

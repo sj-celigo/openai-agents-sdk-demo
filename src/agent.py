@@ -1,21 +1,19 @@
 """Research Assistant Agent using OpenAI Agents SDK."""
 
-import json
 import logging
-from typing import Any, Dict, List, Optional
-from openai import OpenAI
+from typing import Optional
+from agents import Agent, Runner
 
 from .models.data_models import ResearchQuery, ResearchResult, ResearchDepth
-from .tools.web_search import WebSearchTool
-from .tools.webpage_fetcher import WebpageFetcherTool
+from .tools import web_search, fetch_webpage, init_web_search_tool, init_webpage_fetcher_tool, set_citation_manager
 from .utils.config import Config
-from .utils.citation import CitationManager, Citation
+from .utils.citation import CitationManager
 
 logger = logging.getLogger(__name__)
 
 
 class ResearchAgent:
-    """AI agent for conducting research using OpenAI."""
+    """AI agent for conducting research using OpenAI Agents SDK."""
     
     SYSTEM_PROMPT = """You are a professional research assistant. Your role is to:
 
@@ -44,30 +42,15 @@ Always be thorough, accurate, and transparent about your sources."""
         from .utils.config import get_config
         
         self.config = config or get_config()
-        self.client = OpenAI(api_key=self.config.openai_api_key)
         self.citation_manager = CitationManager()
         
-        # Initialize tools
-        self.web_search_tool = WebSearchTool(self.config)
-        self.webpage_fetcher_tool = WebpageFetcherTool(self.config)
+        # Initialize tools with configuration
+        init_web_search_tool(self.config)
+        init_webpage_fetcher_tool(self.config)
+        set_citation_manager(self.citation_manager)
         
-        # Map tool names to execution methods
-        self.tool_map = {
-            "web_search": self.web_search_tool.execute,
-            "fetch_webpage": self.webpage_fetcher_tool.execute,
-        }
-    
-    def get_tools_schema(self) -> List[Dict[str, Any]]:
-        """
-        Get the tools schema for OpenAI function calling.
-        
-        Returns:
-            List of tool schemas
-        """
-        return [
-            self.web_search_tool.get_schema(),
-            self.webpage_fetcher_tool.get_schema(),
-        ]
+        # Create the agent with tools
+        self.agent = None  # Will be created per research call with custom instructions
     
     def research(
         self,
@@ -95,135 +78,72 @@ Always be thorough, accurate, and transparent about your sources."""
         logger.info(f"Starting research on: {query}")
         self.citation_manager.clear()
         
-        # Create messages
-        messages = [
-            {
-                "role": "system",
-                "content": self.SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": self._create_research_prompt(research_query),
-            },
-        ]
+        # Create custom instructions for this research query
+        instructions = self._create_research_instructions(research_query)
         
-        # Run agent loop with function calling
-        sources_consulted = []
-        max_iterations = 10
+        # Create agent for this research
+        agent = Agent(
+            name="Research Assistant",
+            instructions=instructions,
+            tools=[web_search, fetch_webpage],
+            model=self.config.agent_model,
+            # Note: temperature is set via model_settings if needed
+        )
         
-        for iteration in range(max_iterations):
-            logger.info(f"Agent iteration {iteration + 1}/{max_iterations}")
-            
-            response = self.client.chat.completions.create(
-                model=self.config.agent_model,
-                messages=messages,
-                tools=self.get_tools_schema(),
-                temperature=self.config.agent_temperature,
+        # Run the agent using Runner
+        try:
+            result = Runner.run_sync(
+                agent,
+                input=f"Research the following topic: {query}",
+                max_turns=10,  # Equivalent to max_iterations
             )
             
-            message = response.choices[0].message
-            messages.append(message.model_dump())
+            logger.info("Research complete")
             
-            # Check if agent wants to call tools
-            if message.tool_calls:
-                # Execute tool calls
-                for tool_call in message.tool_calls:
-                    result = self._execute_tool_call(tool_call)
-                    
-                    # Track sources
-                    if tool_call.function.name == "fetch_webpage":
-                        args = json.loads(tool_call.function.arguments)
-                        if result.get("success"):
-                            sources_consulted.append(args["url"])
-                    
-                    # Add tool result to messages
-                    messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": json.dumps(result),
-                    })
-            else:
-                # Agent has finished, return final response
-                summary = message.content or ""
-                
-                logger.info("Research complete")
-                
-                return ResearchResult(
-                    query=query,
-                    summary=summary + "\n\n" + self.citation_manager.format_bibliography(),
-                    sources_consulted=sources_consulted,
-                    research_depth=research_depth,
-                )
-        
-        # Max iterations reached
-        logger.warning("Max iterations reached")
-        final_message = messages[-1].get("content", "Research incomplete due to iteration limit.")
-        
-        return ResearchResult(
-            query=query,
-            summary=final_message + "\n\n" + self.citation_manager.format_bibliography(),
-            sources_consulted=sources_consulted,
-            research_depth=research_depth,
-        )
+            # Extract the final output
+            summary = result.final_output if hasattr(result, 'final_output') else str(result)
+            
+            # Get sources from citation manager
+            sources_consulted = [citation.url for citation in self.citation_manager.citations]
+            
+            return ResearchResult(
+                query=query,
+                summary=summary + "\n\n" + self.citation_manager.format_bibliography(),
+                sources_consulted=sources_consulted,
+                research_depth=research_depth,
+            )
+            
+        except Exception as e:
+            logger.error(f"Research failed: {str(e)}")
+            # Return error result
+            return ResearchResult(
+                query=query,
+                summary=f"Research failed: {str(e)}",
+                sources_consulted=[],
+                research_depth=research_depth,
+            )
     
-    def _create_research_prompt(self, query: ResearchQuery) -> str:
-        """Create the research prompt for the agent."""
+    def _create_research_instructions(self, query: ResearchQuery) -> str:
+        """Create the research instructions for the agent."""
         depth_instructions = {
             ResearchDepth.QUICK: "Do a quick search and provide a brief summary from 2-3 sources.",
             ResearchDepth.STANDARD: "Search multiple sources and provide a comprehensive summary.",
             ResearchDepth.COMPREHENSIVE: "Conduct in-depth research across many sources and provide detailed analysis.",
         }
         
-        return f"""Research the following topic: {query.query}
+        custom_instructions = f"""
+{self.SYSTEM_PROMPT}
 
 Research depth: {query.research_depth}
 {depth_instructions.get(query.research_depth, "")}
 
 Please:
 1. Search for relevant information using web_search
-2. Read the most relevant sources using fetch_webpage
+2. Read the most relevant sources using fetch_webpage (up to {query.max_sources} sources)
 3. Synthesize the information into a clear, well-organized summary
 4. Cite all sources using [1], [2], etc. format
 5. Provide a sources section at the end
 
 Begin your research now."""
-    
-    def _execute_tool_call(self, tool_call: Any) -> Dict[str, Any]:
-        """
-        Execute a tool call from the agent.
         
-        Args:
-            tool_call: OpenAI tool call object
-            
-        Returns:
-            Tool execution result
-        """
-        function_name = tool_call.function.name
-        arguments = json.loads(tool_call.function.arguments)
-        
-        logger.info(f"Executing tool: {function_name}")
-        logger.debug(f"Arguments: {arguments}")
-        
-        if function_name not in self.tool_map:
-            return {"error": f"Unknown tool: {function_name}"}
-        
-        try:
-            result = self.tool_map[function_name](**arguments)
-            
-            # Track citations for fetched webpages
-            if function_name == "fetch_webpage" and result.get("success"):
-                citation = Citation(
-                    url=result["url"],
-                    title=result.get("title", "Untitled"),
-                    snippet=result.get("content", "")[:200] if result.get("content") else None,
-                    author=result.get("author"),
-                    published_date=result.get("published_date"),
-                )
-                self.citation_manager.add_citation(citation)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Tool execution failed: {str(e)}")
-            return {"error": str(e)}
-
+        return custom_instructions

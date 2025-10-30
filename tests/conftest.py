@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from src.utils.config import Config
@@ -79,26 +79,16 @@ def mock_tavily_client(sample_search_results):
 
 
 @pytest.fixture
-def mock_openai_client():
-    """Mock OpenAI client for testing."""
-    mock_client = MagicMock()
-    
-    # Mock completion response without tool calls
-    mock_response = MagicMock()
-    mock_choice = MagicMock()
-    mock_message = MagicMock()
-    mock_message.content = "Here is a summary of the research findings..."
-    mock_message.tool_calls = None
-    mock_message.model_dump.return_value = {
-        "role": "assistant",
-        "content": "Here is a summary of the research findings...",
-    }
-    mock_choice.message = mock_message
-    mock_response.choices = [mock_choice]
-    
-    mock_client.chat.completions.create.return_value = mock_response
-    
-    return mock_client
+def mock_runner():
+    """Mock agents.Runner for testing."""
+    with patch('agents.Runner') as mock:
+        # Create a mock result object
+        mock_result = MagicMock()
+        mock_result.final_output = "Here is a summary of the research findings..."
+        
+        # Configure run_sync to return the mock result
+        mock.run_sync.return_value = mock_result
+        yield mock
 
 
 @pytest.fixture
@@ -134,4 +124,3 @@ def set_test_env_vars():
         del os.environ["OPENAI_API_KEY"]
     if "TAVILY_API_KEY" in os.environ:
         del os.environ["TAVILY_API_KEY"]
-

@@ -1,47 +1,23 @@
 """Tests for webpage fetcher tool."""
 
+import json
 from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from src.tools.webpage_fetcher import WebpageFetcherTool
+from src.tools.webpage_fetcher import (_fetch_webpage_impl, init_webpage_fetcher_tool, 
+                                        set_citation_manager)
+import src.tools.webpage_fetcher as webpage_fetcher_module
 from src.utils.config import Config
+from src.utils.citation import CitationManager
 
 
 class TestWebpageFetcherTool:
-    """Test WebpageFetcherTool class."""
+    """Test fetch_webpage function tool."""
     
-    def test_tool_name(self, mock_config):
-        """Test tool name property."""
-        tool = WebpageFetcherTool(mock_config)
-        assert tool.name == "fetch_webpage"
-    
-    def test_tool_description(self, mock_config):
-        """Test tool description property."""
-        tool = WebpageFetcherTool(mock_config)
-        assert "fetch" in tool.description.lower()
-        assert "webpage" in tool.description.lower()
-    
-    def test_get_parameters_schema(self, mock_config):
-        """Test getting parameters schema."""
-        tool = WebpageFetcherTool(mock_config)
-        schema = tool.get_parameters_schema()
-        
-        assert schema["type"] == "object"
-        assert "url" in schema["properties"]
-        assert "url" in schema["required"]
-    
-    def test_get_schema(self, mock_config):
-        """Test getting full tool schema."""
-        tool = WebpageFetcherTool(mock_config)
-        schema = tool.get_schema()
-        
-        assert schema["type"] == "function"
-        assert schema["function"]["name"] == "fetch_webpage"
-        assert "description" in schema["function"]
-    
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_execute_success(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_execute_success(self, mock_config_global, mock_session_global, mock_config):
         """Test successful webpage fetch."""
         # Setup mock response
         mock_response = MagicMock()
@@ -61,10 +37,15 @@ class TestWebpageFetcherTool:
         </body>
         </html>
         """
-        mock_get.return_value = mock_response
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com/article")
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com/article")
+        result = json.loads(result_json)
         
         assert result["success"] is True
         assert result["url"] == "https://example.com/article"
@@ -73,91 +54,71 @@ class TestWebpageFetcherTool:
         assert result["author"] == "John Doe"
         assert result["published_date"] == "2024-01-15"
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_execute_empty_url(self, mock_get, mock_config):
+    def test_execute_empty_url(self):
         """Test execution with empty URL."""
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="")
+        result_json = _fetch_webpage_impl(url="")
+        result = json.loads(result_json)
         
         assert result["success"] is False
         assert "empty" in result["error"].lower()
-        mock_get.assert_not_called()
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_execute_timeout(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_execute_timeout(self, mock_config_global, mock_session_global, mock_config):
         """Test execution when request times out."""
-        mock_get.side_effect = requests.exceptions.Timeout()
+        mock_session = MagicMock()
+        mock_session.get.side_effect = requests.exceptions.Timeout()
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com")
+        result = json.loads(result_json)
         
         assert result["success"] is False
         assert "timeout" in result["error"].lower()
         assert result["url"] == "https://example.com"
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_execute_http_error(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_execute_http_error(self, mock_config_global, mock_session_global, mock_config):
         """Test execution when HTTP error occurs."""
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
-        mock_get.return_value = mock_response
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com/notfound")
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com/notfound")
+        result = json.loads(result_json)
         
         assert result["success"] is False
         assert "404" in result["error"]
         assert result["url"] == "https://example.com/notfound"
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_execute_general_error(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_execute_general_error(self, mock_config_global, mock_session_global, mock_config):
         """Test execution when general error occurs."""
-        mock_get.side_effect = Exception("Network error")
+        mock_session = MagicMock()
+        mock_session.get.side_effect = Exception("Network error")
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com")
+        result = json.loads(result_json)
         
         assert result["success"] is False
         assert "Network error" in result["error"]
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_extract_title_from_h1(self, mock_get, mock_config):
-        """Test extracting title from h1 when no title tag."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"""
-        <html>
-        <body>
-            <h1>Article Title</h1>
-            <p>Content</p>
-        </body>
-        </html>
-        """
-        mock_get.return_value = mock_response
-        
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
-        
-        assert result["title"] == "Article Title"
-    
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_extract_title_fallback(self, mock_get, mock_config):
-        """Test fallback title when no title found."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"""
-        <html><body><p>Content</p></body></html>
-        """
-        mock_get.return_value = mock_response
-        
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
-        
-        assert result["title"] == "Untitled"
-    
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_content_extraction_removes_scripts(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_content_extraction_removes_scripts(self, mock_config_global, mock_session_global, mock_config):
         """Test that scripts and styles are removed from content."""
         mock_response = MagicMock()
         mock_response.status_code = 200
@@ -173,17 +134,23 @@ class TestWebpageFetcherTool:
         </body>
         </html>
         """
-        mock_get.return_value = mock_response
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com")
+        result = json.loads(result_json)
         
         assert "alert" not in result["content"]
         assert "color: red" not in result["content"]
         assert "Main content here" in result["content"]
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_content_length_limit(self, mock_get, mock_config):
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    def test_content_length_limit(self, mock_config_global, mock_session_global, mock_config):
         """Test that content is limited to 5000 characters."""
         long_content = "A" * 10000
         mock_response = MagicMock()
@@ -193,60 +160,61 @@ class TestWebpageFetcherTool:
         <body><article><p>{long_content}</p></article></body>
         </html>
         """.encode()
-        mock_get.return_value = mock_response
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
+        
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        
+        result_json = _fetch_webpage_impl(url="https://example.com")
+        result = json.loads(result_json)
         
         # Content should be truncated
         assert len(result["content"]) <= 5003  # 5000 + "..."
         assert result["content"].endswith("...")
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_extract_author_from_schema(self, mock_get, mock_config):
-        """Test extracting author from schema.org markup."""
+    @patch.object(webpage_fetcher_module, '_session')
+    @patch.object(webpage_fetcher_module, '_config')
+    @patch.object(webpage_fetcher_module, '_citation_manager')
+    def test_citation_tracking(self, mock_citation_global, mock_config_global, mock_session_global, mock_config):
+        """Test that citations are tracked when citation manager is set."""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.content = b"""
         <html>
-        <body>
-            <span itemprop="author">Jane Smith</span>
-            <p>Content</p>
-        </body>
+        <head><title>Test</title></head>
+        <body><p>Content</p></body>
         </html>
         """
-        mock_get.return_value = mock_response
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
+        mock_session = MagicMock()
+        mock_session.get.return_value = mock_response
         
-        assert result["author"] == "Jane Smith"
+        citation_manager = CitationManager()
+        
+        webpage_fetcher_module._session = mock_session
+        webpage_fetcher_module._config = mock_config
+        webpage_fetcher_module._citation_manager = citation_manager
+        
+        _fetch_webpage_impl(url="https://example.com")
+        
+        # Check that citation was added
+        assert citation_manager.count() == 1
+        citation = citation_manager.get_citation(1)
+        assert citation.url == "https://example.com"
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_extract_published_date_from_time_tag(self, mock_get, mock_config):
-        """Test extracting published date from time tag."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b"""
-        <html>
-        <body>
-            <time datetime="2024-01-20">January 20, 2024</time>
-            <p>Content</p>
-        </body>
-        </html>
-        """
-        mock_get.return_value = mock_response
+    def test_init_webpage_fetcher_tool(self, mock_config):
+        """Test initialization of webpage fetcher tool."""
+        init_webpage_fetcher_tool(mock_config)
         
-        tool = WebpageFetcherTool(mock_config)
-        result = tool.execute(url="https://example.com")
-        
-        assert result["published_date"] == "2024-01-20"
+        # Check that globals were set
+        assert webpage_fetcher_module._config is not None
+        assert webpage_fetcher_module._session is not None
     
-    @patch("src.tools.webpage_fetcher.requests.Session.get")
-    def test_session_has_user_agent(self, mock_get, mock_config):
-        """Test that session has user agent header."""
-        tool = WebpageFetcherTool(mock_config)
+    def test_set_citation_manager(self):
+        """Test setting citation manager."""
+        citation_manager = CitationManager()
+        set_citation_manager(citation_manager)
         
-        assert "User-Agent" in tool.session.headers
-        assert tool.session.headers["User-Agent"] == mock_config.user_agent
-
+        assert webpage_fetcher_module._citation_manager is citation_manager

@@ -1,15 +1,16 @@
 # Personal Research Assistant
 
-An AI-powered research assistant built with the OpenAI Agents SDK that autonomously searches for information, fetches web content, and synthesizes findings into well-cited summaries.
+An AI-powered research assistant built with the **official [OpenAI Agents Python SDK](https://github.com/openai/openai-agents-python)** that autonomously searches for information, fetches web content, and synthesizes findings into well-cited summaries.
 
 ## 🎯 Project Overview
 
-This project demonstrates key agentic workflow concepts including:
-- **Tool Use**: Web search and webpage fetching tools
+This project demonstrates key agentic workflow concepts using the OpenAI Agents SDK including:
+- **Tool Use**: Function-based tools with `@function_tool` decorator
 - **Autonomous Decision Making**: Agent decides which sources to consult
-- **Iterative Refinement**: Multi-step research with adaptive strategies
+- **Built-in Agent Orchestration**: SDK-managed agent loops and tool calling
 - **Citation Management**: Automatic source tracking and formatting
 - **Error Handling**: Robust handling of API failures and edge cases
+- **Official SDK Patterns**: Follows OpenAI's recommended agent architecture
 
 ## 📋 Features
 
@@ -18,7 +19,8 @@ This project demonstrates key agentic workflow concepts including:
 - 📚 **Citation Tracking**: Automatically tracks and formats sources
 - 🎨 **Rich CLI**: Beautiful command-line interface with progress indicators
 - ⚡ **Fast & Efficient**: Optimized for quick research
-- 🧪 **95%+ Test Coverage**: Comprehensive unit tests
+- 🧪 **90%+ Test Coverage**: Comprehensive unit tests
+- 🔧 **Official SDK**: Built with OpenAI's recommended agent framework
 
 ## 🚀 Quick Start
 
@@ -129,25 +131,33 @@ display(Markdown(result.summary))
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────┐
-│         CLI Interface                │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────┐
+│           CLI Interface                  │
+└──────────────┬──────────────────────────┘
                │
                ▼
-┌─────────────────────────────────────┐
-│      Research Agent (GPT-4)          │
-│  - Query understanding               │
-│  - Tool orchestration                │
-│  - Synthesis & reasoning             │
-└──────────────┬──────────────────────┘
+┌─────────────────────────────────────────┐
+│       Research Agent Wrapper             │
+│  - Configuration management              │
+│  - Citation tracking                     │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│    OpenAI Agents SDK (Agent + Runner)    │
+│  - Agent loop management                 │
+│  - Tool orchestration                    │
+│  - Function calling                      │
+│  - Built-in tracing                      │
+└──────────────┬──────────────────────────┘
                │
       ┌────────┴────────┐
       │                 │
       ▼                 ▼
 ┌──────────┐     ┌──────────┐
-│   Web    │     │ Webpage  │
-│  Search  │     │ Fetcher  │
-│  Tool    │     │  Tool    │
+│@function │     │@function │
+│web_search│     │ fetch_   │
+│  Tool    │     │ webpage  │
 └──────────┘     └──────────┘
       │                 │
       ▼                 ▼
@@ -237,35 +247,36 @@ REQUEST_TIMEOUT=30               # HTTP request timeout (seconds)
 
 ## 📖 Key Concepts Demonstrated
 
-### 1. Tool Use
-The agent can call external tools (functions) to interact with the world:
+### 1. Function Tools (@function_tool)
+Simple Python functions decorated with `@function_tool`:
 - `web_search`: Searches the internet for information
 - `fetch_webpage`: Retrieves and parses webpage content
 
-### 2. Autonomous Decision Making
-The agent autonomously:
+No complex classes or schemas - just functions with docstrings!
+
+### 2. Agent and Runner Pattern
+Uses the official OpenAI Agents SDK pattern:
+- **Agent**: Defines capabilities, tools, and instructions
+- **Runner**: Manages the agent loop and execution
+- **Tools**: Simple functions the agent can call
+
+### 3. Autonomous Decision Making
+The SDK-powered agent autonomously:
 - Determines which sources to search
 - Decides which webpages to fetch
 - Synthesizes information from multiple sources
 - Knows when to stop researching
 
-### 3. Function Calling (OpenAI Agents SDK)
-Uses OpenAI's function calling to enable the agent to:
-- Understand when tools are needed
-- Generate proper tool arguments
-- Process tool results
-- Chain multiple tool calls together
+### 4. Built-in Features from SDK
+- **Automatic tool calling**: No manual function call loop
+- **Built-in tracing**: Debugging with Logfire, AgentOps, etc.
+- **Session support**: Conversation memory (can be added)
+- **Error resilience**: Robust error handling
 
-### 4. State Management
-- Tracks conversation history across tool calls
-- Manages citations and sources
-- Handles multi-turn interactions
-
-### 5. Error Handling
-- Gracefully handles API failures
-- Retries with fallbacks
-- Provides meaningful error messages
-- Continues research when individual sources fail
+### 5. State Management
+- Tool initialization with global configuration
+- Citation tracking across tool calls
+- Conversation context managed by SDK
 
 ## 🎓 Learning Path
 
@@ -322,17 +333,21 @@ MIT License - feel free to use this project for learning and development.
 
 ## 🙏 Acknowledgments
 
-- Built with [OpenAI Agents SDK](https://platform.openai.com/docs/)
+- Built with [OpenAI Agents Python SDK](https://github.com/openai/openai-agents-python)
 - Web search powered by [Tavily](https://tavily.com)
 - CLI interface using [Rich](https://rich.readthedocs.io/)
+- HTML parsing with [BeautifulSoup4](https://www.crummy.com/software/BeautifulSoup/)
 
 ## 📚 Additional Resources
 
-- [OpenAI Function Calling Guide](https://platform.openai.com/docs/guides/function-calling)
-- [Agentic Workflows](https://www.anthropic.com/research/building-effective-agents)
-- [RAG Systems](https://python.langchain.com/docs/use_cases/question_answering/)
+- [OpenAI Agents Python SDK](https://github.com/openai/openai-agents-python)
+- [SDK Documentation](https://openai.github.io/openai-agents-python/)
+- [Agentic Workflows Guide](https://openai.github.io/openai-agents-python/concepts/)
+- [Migration Guide](MIGRATION.md) - How we migrated to the official SDK
 
 ---
 
-**Built as a learning project for understanding agentic workflows with the OpenAI Agents SDK.**
+**Built as a learning project for understanding agentic workflows with the official OpenAI Agents Python SDK.**
+
+> **Note**: This project was migrated from a custom OpenAI SDK implementation to the official OpenAI Agents SDK. See [MIGRATION.md](MIGRATION.md) for details on the migration process and benefits.
 

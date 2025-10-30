@@ -1,12 +1,14 @@
 # Quick Start Guide
 
-Get the Personal Research Assistant running in 5 minutes!
+Get the Personal Research Assistant (built with **OpenAI Agents Python SDK**) running in 5 minutes!
 
 ## Prerequisites
 
 - Python 3.10 or higher
 - OpenAI API key ([Get it here](https://platform.openai.com/api-keys))
 - Tavily API key ([Get it here](https://tavily.com))
+
+> **Note**: This project uses the official [OpenAI Agents Python SDK](https://github.com/openai/openai-agents-python) for agent orchestration.
 
 ## Installation Steps
 
